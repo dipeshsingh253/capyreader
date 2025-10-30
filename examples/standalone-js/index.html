@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Article Extractor - Demo</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+      line-height: 1.6;
+      color: #333;
+      background: #f5f5f5;
+    }
+
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 2rem 1rem;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 3rem;
+    }
+
+    h1 {
+      font-size: 2rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .subtitle {
+      color: #666;
+      font-size: 1rem;
+    }
+
+    .input-group {
+      background: white;
+      padding: 2rem;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      margin-bottom: 2rem;
+    }
+
+    .input-wrapper {
+      display: flex;
+      gap: 1rem;
+      margin-bottom: 1rem;
+    }
+
+    input[type="url"] {
+      flex: 1;
+      padding: 0.75rem;
+      border: 2px solid #ddd;
+      border-radius: 4px;
+      font-size: 1rem;
+    }
+
+    input[type="url"]:focus {
+      outline: none;
+      border-color: #6200ee;
+    }
+
+    button {
+      padding: 0.75rem 2rem;
+      background: #6200ee;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    button:hover {
+      background: #5000d0;
+    }
+
+    button:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+
+    .options {
+      display: flex;
+      gap: 1rem;
+      align-items: center;
+    }
+
+    label {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      cursor: pointer;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 2rem;
+      color: #666;
+    }
+
+    .error {
+      background: #ffebee;
+      color: #c62828;
+      padding: 1rem;
+      border-radius: 4px;
+      margin-bottom: 1rem;
+    }
+
+    .article {
+      background: white;
+      padding: 3rem 2rem;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    .article-header {
+      margin-bottom: 2rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid #eee;
+    }
+
+    .article-title {
+      font-size: 2rem;
+      line-height: 1.2;
+      margin-bottom: 0.5rem;
+    }
+
+    .article-meta {
+      color: #666;
+      font-size: 0.9rem;
+    }
+
+    .article-content {
+      font-size: 1.125rem;
+      line-height: 1.6;
+    }
+
+    .article-content img {
+      max-width: 100%;
+      height: auto;
+      margin: 1.5rem 0;
+      border-radius: 4px;
+    }
+
+    .article-content h1,
+    .article-content h2,
+    .article-content h3 {
+      margin: 1.5rem 0 1rem;
+    }
+
+    .article-content p {
+      margin-bottom: 1rem;
+    }
+
+    .article-content pre {
+      background: #f5f5f5;
+      padding: 1rem;
+      border-radius: 4px;
+      overflow-x: auto;
+      margin: 1rem 0;
+    }
+
+    .article-content code {
+      background: #f5f5f5;
+      padding: 0.2em 0.4em;
+      border-radius: 3px;
+      font-family: 'Courier New', monospace;
+    }
+
+    .table__wrapper {
+      overflow-x: auto;
+      margin: 1rem 0;
+    }
+
+    .table__wrapper table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .table__wrapper td,
+    .table__wrapper th {
+      border: 1px solid #ddd;
+      padding: 0.5rem;
+      text-align: left;
+    }
+
+    .table__wrapper th {
+      background: #f5f5f5;
+      font-weight: 600;
+    }
+
+    #result {
+      display: none;
+    }
+
+    #result.visible {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>📰 Article Extractor</h1>
+      <p class="subtitle">Based on Capy Reader's extraction logic</p>
+    </header>
+
+    <div class="input-group">
+      <div class="input-wrapper">
+        <input 
+          type="url" 
+          id="articleUrl" 
+          placeholder="Enter article URL (e.g., https://www.theverge.com/...)"
+          required
+        >
+        <button id="extractBtn" onclick="extractArticle()">Extract</button>
+      </div>
+      
+      <div class="options">
+        <label>
+          <input type="checkbox" id="hideImages">
+          Hide Images
+        </label>
+      </div>
+    </div>
+
+    <div id="result">
+      <div id="error" class="error" style="display: none;"></div>
+      <div id="loading" class="loading" style="display: none;">
+        Extracting article...
+      </div>
+      <div id="article" class="article" style="display: none;"></div>
+    </div>
+  </div>
+
+  <!-- Mercury Parser -->
+  <script src="https://unpkg.com/@postlight/mercury-parser@2.2.0/dist/mercury.web.js"></script>
+
+  <script>
+    /**
+     * Clean and process HTML content
+     * Based on Capy Reader's HtmlPostProcessor
+     */
+    function cleanHtml(htmlString, hideImages = false) {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(htmlString, 'text/html');
+      
+      // 1. Remove inline styles
+      doc.querySelectorAll('[style]').forEach(el => {
+        el.removeAttribute('style');
+      });
+      
+      // 2. Remove images if requested
+      if (hideImages) {
+        doc.querySelectorAll('img').forEach(img => img.remove());
+      } else {
+        // 3. Process images for optimal loading
+        doc.querySelectorAll('img').forEach((img, index) => {
+          // Set loading priority
+          if (index === 0) {
+            img.setAttribute('fetchpriority', 'high');
+          } else {
+            img.setAttribute('loading', 'lazy');
+          }
+          
+          // Handle data-src (lazy loaded images)
+          const dataSrc = img.getAttribute('data-src');
+          if (dataSrc) {
+            img.setAttribute('src', dataSrc);
+          }
+        });
+        
+        // 4. Extract images from anchor tags
+        doc.querySelectorAll('a img').forEach(img => {
+          const anchor = img.closest('a');
+          if (anchor && anchor.parentNode) {
+            anchor.parentNode.insertBefore(img, anchor);
+            if (anchor.childNodes.length === 0) {
+              anchor.remove();
+            }
+          }
+        });
+      }
+      
+      // 5. Wrap tables for responsive display
+      doc.querySelectorAll('table').forEach(table => {
+        if (!table.parentElement.classList.contains('table__wrapper')) {
+          const wrapper = document.createElement('div');
+          wrapper.className = 'table__wrapper';
+          table.parentNode.insertBefore(wrapper, table);
+          wrapper.appendChild(table);
+        }
+      });
+      
+      return doc.body.innerHTML;
+    }
+
+    /**
+     * Extract and display article
+     */
+    async function extractArticle() {
+      const urlInput = document.getElementById('articleUrl');
+      const hideImages = document.getElementById('hideImages').checked;
+      const extractBtn = document.getElementById('extractBtn');
+      const result = document.getElementById('result');
+      const error = document.getElementById('error');
+      const loading = document.getElementById('loading');
+      const article = document.getElementById('article');
+      
+      const url = urlInput.value.trim();
+      
+      if (!url) {
+        showError('Please enter a valid URL');
+        return;
+      }
+      
+      // Show loading state
+      result.classList.add('visible');
+      error.style.display = 'none';
+      loading.style.display = 'block';
+      article.style.display = 'none';
+      extractBtn.disabled = true;
+      
+      try {
+        // Note: For production, you need a CORS proxy or backend API
+        // This example uses allorigins.win as a demo CORS proxy
+        const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
+        const response = await fetch(proxyUrl);
+        const data = await response.json();
+        
+        if (!data.contents) {
+          throw new Error('Failed to fetch article');
+        }
+        
+        // Parse with Mercury
+        const parsed = await Mercury.parse(url, {
+          html: data.contents
+        });
+        
+        if (!parsed) {
+          throw new Error('Failed to parse article');
+        }
+        
+        // Clean HTML
+        const cleanedContent = cleanHtml(parsed.content, hideImages);
+        
+        // Display article
+        displayArticle({
+          title: parsed.title,
+          author: parsed.author,
+          content: cleanedContent,
+          excerpt: parsed.excerpt,
+          leadImage: parsed.lead_image_url,
+          publishedDate: parsed.date_published,
+          url: parsed.url
+        });
+        
+      } catch (err) {
+        console.error('Error:', err);
+        showError('Failed to extract article. ' + err.message);
+      } finally {
+        loading.style.display = 'none';
+        extractBtn.disabled = false;
+      }
+    }
+
+    /**
+     * Display extracted article
+     */
+    function displayArticle(articleData) {
+      const article = document.getElementById('article');
+      
+      const meta = [];
+      if (articleData.author) meta.push(`By ${articleData.author}`);
+      if (articleData.publishedDate) {
+        const date = new Date(articleData.publishedDate);
+        meta.push(date.toLocaleDateString());
+      }
+      
+      article.innerHTML = `
+        <div class="article-header">
+          <h1 class="article-title">${articleData.title}</h1>
+          ${meta.length > 0 ? `<div class="article-meta">${meta.join(' • ')}</div>` : ''}
+        </div>
+        <div class="article-content">
+          ${articleData.content}
+        </div>
+      `;
+      
+      article.style.display = 'block';
+    }
+
+    /**
+     * Show error message
+     */
+    function showError(message) {
+      const result = document.getElementById('result');
+      const error = document.getElementById('error');
+      const article = document.getElementById('article');
+      
+      result.classList.add('visible');
+      error.textContent = message;
+      error.style.display = 'block';
+      article.style.display = 'none';
+    }
+
+    // Allow Enter key to trigger extraction
+    document.getElementById('articleUrl').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        extractArticle();
+      }
+    });
+  </script>
+</body>
+</html>
